@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calorie Tracker</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            flex-direction: column;
+        }
+
+        .header {
+            background-color: #343a40;
+            color: white;
+            width: 100%;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .container {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            width: 800px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .form-section, .list-section {
+            width: 48%;
+        }
+
+        .form-section h2, .list-section h2 {
+            margin-bottom: 20px;
+        }
+
+        form {
+            display: flex;
+            flex-direction: column;
+        }
+
+        label {
+            margin-top: 10px;
+        }
+
+        input {
+            padding: 8px;
+            margin-top: 5px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        button {
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        li {
+            background-color: #f9f9f9;
+            padding: 10px;
+            border: 1px solid #ddd;
+            margin-top: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .buttons {
+            display: flex;
+            align-items: center;
+        }
+
+        .opinion button {
+            background-color: red;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            cursor: pointer;
+            margin-left: 5px;
+        }
+
+        .opinion button.gustado {
+            background-color: green;
+        }
+
+        .opinion button.no-opinion {
+            background-color: grey;
+        }
+
+        .delete-btn {
+            background-color: red;
+            margin-left: 10px;
+        }
+
+        .delete-btn, .clear-btn {
+            margin-left: 10px;
+        }
+
+        .clear-btn {
+            background-color: red;
+            margin-top: 10px;
+        }
+
+        .date {
+            color: grey;
+            font-size: 0.8em;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Calorie Tracker</h1>
+    </div>
+    <div class="container">
+        <div class="form-section">
+            <h2>Log Calorie Intake</h2>
+            <form id="food-form">
+                <label for="food">Meal:</label>
+                <input type="text" id="food" name="food" required>
+                
+                <label for="calories">Calories:</label>
+                <input type="number" id="calories" name="calories">
+                
+                <button type="submit">Add Entry</button>
+                <button type="button" class="clear-btn">Delete All</button>
+            </form>
+        </div>
+        <div class="list-section">
+            <h2>Historical Data</h2>
+            <ul id="food-list"></ul>
+        </div>
+    </div>
+    
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+    <script>
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyAa9X6t-QOwpCkLYY9s5dCMTigc9BHyHUM",
+            authDomain: "formulario-b222d.firebaseapp.com",
+            projectId: "formulario-b222d",
+            storageBucket: "formulario-b222d.appspot.com",
+            messagingSenderId: "280040740017",
+            appId: "1:280040740017:web:1b1019dc02b0bc186c7e90"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        // Get form and list elements
+        const form = document.getElementById('food-form');
+        const foodList = document.getElementById('food-list');
+        const clearBtn = document.querySelector('.clear-btn');
+
+        // Add food
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            
+            const food = form.food.value;
+            const calories = form.calories.value;
+            const date = new Date().toLocaleDateString();
+            
+            if (food) {
+                db.collection('foods').add({
+                    food,
+                    calories,
+                    date
+                }).then(() => {
+                    form.reset();
+                    loadFoods();
+                });
+            }
+        });
+
+        // Load foods
+        function loadFoods() {
+            foodList.innerHTML = '';
+            db.collection('foods').get().then((querySnapshot) => {
+                querySnapshot.forEach((doc) => {
+                    const foodData = doc.data();
+                    const li = document.createElement('li');
+                    li.innerHTML = `
+                        ${foodData.food} ${foodData.calories ? foodData.calories + ' cal' : 'No calories'} 
+                        <div class="date">${foodData.date}</div>
+                    `;
+                    
+                    const opinionDiv = document.createElement('div');
+                    opinionDiv.classList.add('opinion');
+                    
+                    const likeButton = document.createElement('button');
+                    likeButton.innerHTML = '👍';
+                    if (foodData.opinion && foodData.opinion.toLowerCase() === 'me gusta') {
+                        likeButton.classList.add('gustado');
+                    } else {
+                        likeButton.classList.add('no-opinion');
+                    }
+                    likeButton.addEventListener('click', () => {
+                        updateOpinion(doc.id, 'Me gusta');
+                    });
+                    
+                    const dislikeButton = document.createElement('button');
+                    dislikeButton.innerHTML = '👎';
+                    if (foodData.opinion && foodData.opinion.toLowerCase() === 'no me gusta') {
+                        dislikeButton.classList.add('gustado');
+                    } else {
+                        dislikeButton.classList.add('no-opinion');
+                    }
+                    dislikeButton.addEventListener('click', () => {
+                        updateOpinion(doc.id, 'No me gusta');
+                    });
+                    
+                    opinionDiv.appendChild(likeButton);
+                    opinionDiv.appendChild(dislikeButton);
+                    
+                    const deleteButton = document.createElement('button');
+                    deleteButton.innerHTML = '🗑';
+                    deleteButton.classList.add('delete-btn');
+                    deleteButton.addEventListener('click', () => {
+                        deleteFood(doc.id);
+                    });
+
+                    const buttonsDiv = document.createElement('div');
+                    buttonsDiv.classList.add('buttons');
+                    buttonsDiv.appendChild(opinionDiv);
+                    buttonsDiv.appendChild(deleteButton);
+
+                    li.appendChild(buttonsDiv);
+                    foodList.appendChild(li);
+                });
+            });
+        }
+
+        // Update opinion
+        function updateOpinion(id, opinion) {
+            db.collection('foods').doc(id).update({
+                opinion
+            }).then(() => {
+                loadFoods();
+            });
+        }
+
+        // Delete food
+        function deleteFood(id) {
+            db.collection('foods').doc(id).delete().then(() => {
+                loadFoods();
+            });
+        }
+
+        // Clear all foods
+        clearBtn.addEventListener('click', () => {
+            db.collection('foods').get().then((querySnapshot) => {
+                querySnapshot.forEach((doc) => {
+                    doc.ref.delete();
+                });
+                loadFoods();
+            });
+        });
+
+        // Initial load
+        loadFoods();
+    </script>
+</body>
+</html>
